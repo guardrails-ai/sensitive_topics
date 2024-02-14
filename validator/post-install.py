@@ -1,3 +1,3 @@
 import os
 
-os.system("guardrails hub install hub://guardrails/restrict_to_topic")
+os.system("guardrails hub install hub://tryolabs/restricttotopic")

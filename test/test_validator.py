@@ -1,8 +1,9 @@
 import json
+import pytest
 from unittest.mock import patch
 
 from guardrails.validator_base import FailResult, PassResult
-from guardrails.validators.sensitive_topic import SensitiveTopic
+from validator import SensitiveTopic
 
 DEVICE = -1
 MODEL = "facebook/bart-large-mnli"
@@ -17,12 +18,12 @@ class TestSensitiveTopic:
             llm_callable=LLM_CALLABLE,
             on_fail=None,
         )
-        self.assertEqual(validator._device, DEVICE)
-        self.assertEqual(validator._model, MODEL)
-        self.assertEqual(validator._llm_callable.__name__, "openai_callable")
+        assert validator._device == DEVICE
+        assert validator._model == MODEL
+        assert validator._llm_callable.__name__ == "openai_callable"
 
     def test_init_with_invalid_llm_callable(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             SensitiveTopic(
                 llm_callable="invalid_model",
             )
@@ -36,7 +37,7 @@ class TestSensitiveTopic:
             mock_zero_shot.return_value = ("sports", 0.6)
 
             topics = validator.get_topics_ensemble(text, candidate_topics)
-            self.assertEqual(topics, ["sports", "sports", "sports"])
+            assert topics == ["sports", "sports", "sports"]
 
     def test_get_topics_llm(self):
         text = "This is an article about politics."
@@ -47,12 +48,12 @@ class TestSensitiveTopic:
             mock_llm.return_value = '{"topic": "politics"}'
 
             validation_result = validator.get_topics_llm(text, candidate_topics)
-            self.assertEqual(validation_result, ["politics", "politics", "politics"])
+            assert validation_result == ["politics", "politics", "politics"]
 
     def test_set_callable_string(self):
         validator = SensitiveTopic()
         validator.set_callable("gpt-3.5-turbo")
-        self.assertEqual(validator._llm_callable.__name__, "openai_callable")
+        assert validator._llm_callable.__name__ == "openai_callable"
 
     def test_set_callable_callable(self):
         def custom_callable(text, topics):
@@ -60,7 +61,7 @@ class TestSensitiveTopic:
 
         validator = SensitiveTopic()
         validator.set_callable(custom_callable)
-        self.assertEqual(validator._llm_callable.__name__, "custom_callable")
+        assert validator._llm_callable.__name__ == "custom_callable"
 
     def test_get_topics_zero_shot(self):
         text = "This is an article about technology."
@@ -68,18 +69,12 @@ class TestSensitiveTopic:
         validator = SensitiveTopic(sensitive_topics=candidate_topics)
 
         topics = validator.get_topics_zero_shot(text, candidate_topics)
-        self.assertEqual(
-            ["other", "other", "technology"],
-            topics,
-        )
+        assert ["other", "other", "technology"] == topics
 
         with patch.object(validator, "get_topic_zero_shot") as mock_zero_shot:
             mock_zero_shot.return_value = ("technology", 0.6)
             topics = validator.get_topics_zero_shot(text, candidate_topics)
-            self.assertEqual(
-                ["technology", "technology", "technology"],
-                topics,
-            )
+            assert ["technology", "technology", "technology"] == topics
 
     def test_validate_message_without_sensitive_topic(self):
         text = "This is an article about sports."
@@ -87,7 +82,7 @@ class TestSensitiveTopic:
             sensitive_topics=["violence"],
         )
         validation_result = validator.validate(text, metadata={})
-        self.assertEqual(validation_result, PassResult())
+        assert validation_result == PassResult()
 
     def test_validate_message_with_sensitive_topic(self):
         text = "This is an article about sports."
@@ -95,13 +90,10 @@ class TestSensitiveTopic:
             sensitive_topics=["sports"],
         )
         validation_result = validator.validate(text, metadata={})
-        self.assertEqual(
-            validation_result,
-            FailResult(
-                error_message="Sensitive topics detected: sports",
-                fix_value="Trigger warning:\n- sports\n\n"
-                "This is an article about sports.",
-            ),
+        assert validation_result == FailResult(
+            error_message="Sensitive topics detected: sports",
+            fix_value="Trigger warning:\n- sports\n\n"
+            "This is an article about sports.",
         )
 
     def test_validate_invalid_topic(self):
@@ -112,4 +104,4 @@ class TestSensitiveTopic:
             text = "This is an article about music."
             validation_result = validator.validate(text, metadata={})
 
-            self.assertEqual(validation_result, PassResult())
+            assert validation_result == PassResult()
