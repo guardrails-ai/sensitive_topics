@@ -1,3 +1,3 @@
-print("post-install starting...")
-print("This is where you would do things like download nltk tokenizers or login to the HuggingFace hub...")
-print("post-install complete!")
+import os
+
+os.system("guardrails hub install hub://guardrails/restrict_to_topic")
