@@ -9,5 +9,6 @@ type:
 
 qa:
 	make lint
+	pip install ".[dev]"
 	make type
 	make tests
