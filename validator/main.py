@@ -92,7 +92,7 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
                 "physical illness or injury",
             ]
         super().__init__(
-            valid_topics=[],
+            [],
             invalid_topics=sensitive_topics,
             device=device,
             model=model,
@@ -102,6 +102,18 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
             on_fail=on_fail,
             model_threshold=model_threshold,
         )
+
+    def get_args(self) -> Dict[str, Any]:
+        # Overriding grandparent's get_args to avoid unnecessary arguments
+        return {
+            "sensitive_topics": self._kwargs.get("invalid_topics", None),
+            "device": self._kwargs.get("device", -1),
+            "model": self._kwargs.get("model", "facebook/bart-large-mnli"),
+            "llm_callable": self._kwargs.get("llm_callable", None),
+            "disable_classifier": self._kwargs.get("disable_classifier", False),
+            "disable_llm": self._kwargs.get("disable_llm", False),
+            "model_threshold": self._kwargs.get("model_threshold", 0.5),
+        }
 
     def get_topics_ensemble(self, text: str, candidate_topics: List[str]) -> List[str]:
         applicable_topics = []
