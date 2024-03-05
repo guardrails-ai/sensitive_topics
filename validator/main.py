@@ -1,7 +1,7 @@
 import json
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from guardrails.hub import RestrictToTopic
+from guardrails.hub.guardrails.restricttotopic.validator import RestrictToTopic
 from guardrails.validator_base import (
     FailResult,
     PassResult,
@@ -92,7 +92,7 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
                 "physical illness or injury",
             ]
         super().__init__(
-            [],
+            valid_topics=[],
             invalid_topics=sensitive_topics,
             device=device,
             model=model,
