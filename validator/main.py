@@ -92,7 +92,7 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
                 "physical illness or injury",
             ]
         super().__init__(
-            valid_topics=[],
+            [],
             invalid_topics=sensitive_topics,
             device=device,
             model=model,
