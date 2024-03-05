@@ -1,16 +1,16 @@
 import json
 from typing import Any, Callable, Dict, List, Optional, Union
 
+from guardrails.hub import RestrictToTopic
 from guardrails.validator_base import (
     FailResult,
     PassResult,
     ValidationResult,
     register_validator,
 )
-from guardrails.hub import RestrictToTopic
 
 
-@register_validator(name="sensitive_topic", data_type="string")
+@register_validator(name="guardrails/sensitive_topics", data_type="string")
 class SensitiveTopic(RestrictToTopic):  # type: ignore
     """Checks if text contains any sensitive topics.
     Default behavior first runs a Zero-Shot model, and then falls back to
@@ -20,11 +20,12 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
     increases latency (more than doubles the latency in the worst case).
     Both the Zero-Shot classification and the GPT classification may be toggled.
     **Key Properties**
-    | Property                      | Description                |
-    | ----------------------------- | -------------------------- |
-    | Name for `format` attribute   | `on_topic`                 |
-    | Supported data types          | `string`                   |
-    | Programmatic fix              | Prepends a trigger warning |
+    | Property                      | Description                   |
+    | ----------------------------- | ----------------------------- |
+    | Name for `format` attribute   | `guardrails/sensitive_topics` |
+    | Supported data types          | `string`                      |
+    | Programmatic fix              | Prepends a trigger warning    |
+
     Args:
         sensitive_topics (List[str], Optional, defaults to [
             "holiday or anniversary of the trauma or loss",
