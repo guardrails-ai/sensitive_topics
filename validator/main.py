@@ -115,40 +115,18 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
             "model_threshold": self._kwargs.get("model_threshold", 0.5),
         }
 
-    def get_topics_ensemble(self, text: str, candidate_topics: List[str]) -> List[str]:
+    def get_topics_ensemble(self, text: str, candidate_topics: List[str]):
         applicable_topics = []
 
         topics, scores = self.get_topic_zero_shot(text, candidate_topics)
         for topic, score in zip(topics, scores):
             if score > self._model_threshold:
-                sensitive_topics_warning = "Trigger warning:"
-                for topic in applicable_topics:
-                    sensitive_topics_warning += f"\n- {topic}"
-                fixed_message = f"{sensitive_topics_warning}"
-                return FailResult(
-                    error_message="Sensitive topics detected: "
-                    + ", ".join(applicable_topics),
-                    fix_value=fixed_message,
-                )
+                applicable_topics.append(topic)
             elif score < self._model_threshold:
                 response = self.call_llm(text, candidate_topics)
                 topic = json.loads(response)["topic"]
             if topic != "other":
                 applicable_topics.append(topic)
-
-        return applicable_topics
-
-    def get_topics_llm(self, text: str, candidate_topics: List[str]) -> List[str]:
-        applicable_topics = []
-
-        for candidate_topic in candidate_topics:
-            candidates = [candidate_topic, "other"]
-            response = self.call_llm(text, candidates)
-            topic = json.loads(response)["topic"]
-
-            if topic != "other":
-                applicable_topics.append(topic)
-
         return applicable_topics
 
     def get_topics_zero_shot(self, text: str, candidate_topics: List[str]) -> List[str]:
