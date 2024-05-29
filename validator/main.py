@@ -1,17 +1,13 @@
 import json
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from guardrails.hub.tryolabs.restricttotopic.validator import RestrictToTopic
 from guardrails.validator_base import (
     FailResult,
     PassResult,
     ValidationResult,
     register_validator,
 )
-
-
-@register_validator(name="guardrails/sensitive_topics", data_type="string")
-class SensitiveTopic(RestrictToTopic):  # type: ignore
+from restrict_to_topic import RestrictToTopic
     """Checks if text contains any sensitive topics.
     Default behavior first runs a Zero-Shot model, and then falls back to
     ask OpenAI's `gpt-3.5-turbo` if the Zero-Shot model is not confident
@@ -125,7 +121,19 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
             elif score < self._model_threshold:
                 response = self.call_llm(text, candidate_topics)
                 topic = json.loads(response)["topic"]
-            if topic != "other":
+            if topic in self._invalid_topics:
+                applicable_topics.append(topic)
+        return applicable_topics
+
+    def get_topics_llm(self, text: str, candidate_topics: List[str]) -> List[str]:
+        applicable_topics = []
+
+        for candidate_topic in candidate_topics:
+            candidates = [candidate_topic, "other"]
+            response = self.call_llm(text, candidates)
+            topic = json.loads(response)["topic"]
+
+            if topic not in self._invalid_topics:
                 applicable_topics.append(topic)
         return applicable_topics
 
@@ -167,9 +175,7 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
                 return PassResult()
         else:
             # Use only Zero-Shot, pass or fail here.
-            applicable_topics, scores = self.get_topic_zero_shot(
-                value, list(invalid_topics)
-            )
+            applicable_topics, scores = self.get_topic_zero_shot(value, list(invalid_topics))
             for topic, score in zip(applicable_topics, scores):
                 if score > self._model_threshold:
                     sensitive_topics_warning = "Trigger warning:"
@@ -177,11 +183,12 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
                         sensitive_topics_warning += f"\n- {topic}"
                     fixed_message = f"{sensitive_topics_warning}\n\n{value}"
                     return FailResult(
-                        error_message="Sensitive topics detected: "
-                        + ", ".join(applicable_topics),
+                        error_message="Sensitive topics detected: " + ", ".join(applicable_topics),
                         fix_value=fixed_message,
                     )
             return PassResult()
+        
+ 
 
         sensitive_topics_warning = "Trigger warning:"
         for topic in applicable_topics:
