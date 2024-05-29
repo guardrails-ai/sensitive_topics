@@ -118,16 +118,23 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
     def get_topics_ensemble(self, text: str, candidate_topics: List[str]) -> List[str]:
         applicable_topics = []
 
-        for candidate_topic in candidate_topics:
-            candidates = [candidate_topic, "other"]
-            topic, confidence = self.get_topic_zero_shot(text, candidates)
-
-            if confidence < self._model_threshold:
+        topics, scores = self.get_topic_zero_shot(text, candidate_topics)
+        for topic, score in zip(topics, scores):
+            if score > self._model_threshold:
+                sensitive_topics_warning = "Trigger warning:"
+                for topic in applicable_topics:
+                    sensitive_topics_warning += f"\n- {topic}"
+                fixed_message = f"{sensitive_topics_warning}"
+                return FailResult(
+                    error_message="Sensitive topics detected: " + ", ".join(applicable_topics),
+                    fix_value=fixed_message,
+                )
+            elif score < self._model_threshold:
                 response = self.call_llm(text, candidate_topics)
                 topic = json.loads(response)["topic"]
-
             if topic != "other":
                 applicable_topics.append(topic)
+            
 
         return applicable_topics
 
@@ -173,15 +180,29 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
             not self._disable_classifier and not self._disable_llm
         ):  # Use ensemble (Zero-Shot + Ensemble)
             applicable_topics = self.get_topics_ensemble(value, list(invalid_topics))
+            if not applicable_topics:
+                return PassResult()
         elif self._disable_classifier and not self._disable_llm:
-            # Use only LLM
+            # Use only LLM, pass if good. If not, exit and fail
             applicable_topics = self.get_topics_llm(value, list(invalid_topics))
+            if not applicable_topics:
+                return PassResult()
         else:
-            # Use only Zero-Shot
-            applicable_topics = self.get_topic_zero_shot(value, list(invalid_topics))
-
-        if not applicable_topics:
+            # Use only Zero-Shot, pass or fail here.
+            applicable_topics, scores = self.get_topic_zero_shot(value, list(invalid_topics))
+            for topic, score in zip(applicable_topics, scores):
+                if score > self._model_threshold:
+                    sensitive_topics_warning = "Trigger warning:"
+                    for topic in applicable_topics:
+                        sensitive_topics_warning += f"\n- {topic}"
+                    fixed_message = f"{sensitive_topics_warning}\n\n{value}"
+                    return FailResult(
+                        error_message="Sensitive topics detected: " + ", ".join(applicable_topics),
+                        fix_value=fixed_message,
+                    )
             return PassResult()
+        
+ 
 
         sensitive_topics_warning = "Trigger warning:"
         for topic in applicable_topics:
