@@ -126,7 +126,8 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
                     sensitive_topics_warning += f"\n- {topic}"
                 fixed_message = f"{sensitive_topics_warning}"
                 return FailResult(
-                    error_message="Sensitive topics detected: " + ", ".join(applicable_topics),
+                    error_message="Sensitive topics detected: "
+                    + ", ".join(applicable_topics),
                     fix_value=fixed_message,
                 )
             elif score < self._model_threshold:
@@ -134,7 +135,6 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
                 topic = json.loads(response)["topic"]
             if topic != "other":
                 applicable_topics.append(topic)
-            
 
         return applicable_topics
 
@@ -189,7 +189,9 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
                 return PassResult()
         else:
             # Use only Zero-Shot, pass or fail here.
-            applicable_topics, scores = self.get_topic_zero_shot(value, list(invalid_topics))
+            applicable_topics, scores = self.get_topic_zero_shot(
+                value, list(invalid_topics)
+            )
             for topic, score in zip(applicable_topics, scores):
                 if score > self._model_threshold:
                     sensitive_topics_warning = "Trigger warning:"
@@ -197,12 +199,11 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
                         sensitive_topics_warning += f"\n- {topic}"
                     fixed_message = f"{sensitive_topics_warning}\n\n{value}"
                     return FailResult(
-                        error_message="Sensitive topics detected: " + ", ".join(applicable_topics),
+                        error_message="Sensitive topics detected: "
+                        + ", ".join(applicable_topics),
                         fix_value=fixed_message,
                     )
             return PassResult()
-        
- 
 
         sensitive_topics_warning = "Trigger warning:"
         for topic in applicable_topics:
