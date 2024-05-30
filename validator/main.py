@@ -1,6 +1,8 @@
+import asyncio
 import json
 from typing import Any, Callable, Dict, List, Optional, Union
 
+import nest_asyncio
 from guardrails.hub.tryolabs.restricttotopic.validator import RestrictToTopic
 from guardrails.validator_base import (
     FailResult,
@@ -8,6 +10,8 @@ from guardrails.validator_base import (
     ValidationResult,
     register_validator,
 )
+
+nest_asyncio.apply()
 
 
 @register_validator(name="guardrails/sensitive_topics", data_type="string")
@@ -130,16 +134,23 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
                 applicable_topics.append(topic)
         return applicable_topics
 
-    def get_topics_llm(self, text: str, candidate_topics: List[str]) -> List[str]:
+    async def get_topics_llm(self, text: str, candidate_topics: List[str]) -> List[str]:
         applicable_topics = []
 
-        for candidate_topic in candidate_topics:
+        async def process_candidate(candidate_topic):
             candidates = [candidate_topic, "other"]
-            response = self.call_llm(text, candidates)
+            response = await self.call_llm(text, candidates)
             topic = json.loads(response)["topic"]
 
             if topic not in self._invalid_topics:
                 applicable_topics.append(topic)
+
+        tasks = []
+        for candidate_topic in candidate_topics:
+            task = asyncio.create_task(process_candidate(candidate_topic))
+            tasks.append(task)
+
+        await asyncio.gather(*tasks)
         return applicable_topics
 
     def get_topics_zero_shot(self, text: str, candidate_topics: List[str]) -> List[str]:
@@ -176,7 +187,9 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
                 return PassResult()
         elif self._disable_classifier and not self._disable_llm:
             # Use only LLM, pass if good. If not, exit and fail
-            applicable_topics = self.get_topics_llm(value, list(invalid_topics))
+            applicable_topics = asyncio.run(
+                self.get_topics_llm(value, list(invalid_topics))
+            )
             if not applicable_topics:
                 return PassResult()
         else:
