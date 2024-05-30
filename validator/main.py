@@ -117,38 +117,52 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
         }
 
     def get_topics_ensemble(self, text: str, candidate_topics: List[str]):
+        """Get topics using Zero-Shot and LLM, and return the intersection.
+        
+        This method first gets the topics using Zero-Shot and then falls back to
+        LLM if the confidence score is below the threshold. The final list of
+        topics is the intersection of the two."""
         applicable_topics = []
 
-        topics, scores = self.get_topic_zero_shot(text, candidate_topics)
-        for topic, score in zip(topics, scores):
+        zs_topics, zs_scores = self.get_topic_zero_shot(text, candidate_topics)
+        llm_response = self.call_llm(text, candidate_topics)
+        llm_topics = json.loads(llm_response)["topic"]
+        for topic, score in zip(zs_topics, zs_scores):
             if score > self._model_threshold:
                 applicable_topics.append(topic)
             elif score < self._model_threshold:
-                response = self.call_llm(text, candidate_topics)
-                topic = json.loads(response)["topic"]
-            if topic in self._invalid_topics:
-                applicable_topics.append(topic)
+                if topic in llm_topics:
+                    applicable_topics.append(topic)
         return applicable_topics
 
     def get_topics_llm(self, text: str, candidate_topics: List[str]) -> List[str]:
+        """Get topics using LLM only.
+
+        This method gets the topics using LLM and returns the intersection of
+        the topics with the invalid topics."""
+
         applicable_topics = []
 
-        for candidate_topic in candidate_topics:
-            candidates = [candidate_topic, "other"]
-            response = self.call_llm(text, candidates)
-            topic = json.loads(response)["topic"]
+        llm_response = self.call_llm(text, candidate_topics)
+        llm_topics = json.loads(llm_response)["topic"]
 
-            if topic not in self._invalid_topics:
+        for topic in llm_topics:
+            if topic in self._invalid_topics:
                 applicable_topics.append(topic)
+
         return applicable_topics
 
     def get_topics_zero_shot(self, text: str, candidate_topics: List[str]) -> List[str]:
+        """Get topics using Zero-Shot only.
+
+        This method gets the topics using Zero-Shot and returns the intersection
+        of the topics with the invalid topics if the confidence score is above
+        the threshold."""
+
         applicable_topics = []
+        topics, confidence_scores = self.get_topic_zero_shot(text, candidate_topics)
 
-        for candidate_topic in candidate_topics:
-            candidates = [candidate_topic, "other"]
-            topic, confidence = self.get_topic_zero_shot(text, candidates)
-
+        for topic, confidence in zip(topics, confidence_scores):
             if confidence > self._model_threshold:
                 applicable_topics.append(topic)
 
@@ -163,37 +177,18 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
         if not invalid_topics:
             raise RuntimeError("No invalid topics provided")
 
-        # Check which model(s) to use
-        if self._disable_classifier and self._disable_llm:
-            # Error, no model set
-            raise ValueError("Either classifier or llm must be enabled.")
-        elif (
-            not self._disable_classifier and not self._disable_llm
-        ):  # Use ensemble (Zero-Shot + Ensemble)
+        if not self._disable_classifier and not self._disable_llm:
             applicable_topics = self.get_topics_ensemble(value, list(invalid_topics))
-            if not applicable_topics:
-                return PassResult()
         elif self._disable_classifier and not self._disable_llm:
-            # Use only LLM, pass if good. If not, exit and fail
             applicable_topics = self.get_topics_llm(value, list(invalid_topics))
-            if not applicable_topics:
-                return PassResult()
+        elif not self._disable_classifier and self._disable_llm:
+            applicable_topics, _ = self.get_topic_zero_shot(value, list(invalid_topics))
         else:
-            # Use only Zero-Shot, pass or fail here.
-            applicable_topics, scores = self.get_topic_zero_shot(
-                value, list(invalid_topics)
-            )
-            for topic, score in zip(applicable_topics, scores):
-                if score > self._model_threshold:
-                    sensitive_topics_warning = "Trigger warning:"
-                    for topic in applicable_topics:
-                        sensitive_topics_warning += f"\n- {topic}"
-                    fixed_message = f"{sensitive_topics_warning}\n\n{value}"
-                    return FailResult(
-                        error_message="Sensitive topics detected: "
-                        + ", ".join(applicable_topics),
-                        fix_value=fixed_message,
-                    )
+            raise ValueError("Either classifier or llm must be enabled.")
+
+        # Applicable topics are the intersection of the invalid topics and the
+        # topics detected in the text.
+        if not applicable_topics:
             return PassResult()
 
         sensitive_topics_warning = "Trigger warning:"
