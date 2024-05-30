@@ -1,14 +1,20 @@
 import json
 from typing import Any, Callable, Dict, List, Optional, Union
 
+from guardrails.hub.tryolabs.restricttotopic.validator import RestrictToTopic
+
 from guardrails.validator_base import (
     FailResult,
     PassResult,
     ValidationResult,
     register_validator,
 )
-from restrict_to_topic import RestrictToTopic
+
+
+@register_validator(name="guardrails/sensitive_topics", data_type="string")
+class SensitiveTopic(RestrictToTopic):
     """Checks if text contains any sensitive topics.
+
     Default behavior first runs a Zero-Shot model, and then falls back to
     ask OpenAI's `gpt-3.5-turbo` if the Zero-Shot model is not confident
     in the topic classification (score < 0.5).
@@ -175,7 +181,9 @@ from restrict_to_topic import RestrictToTopic
                 return PassResult()
         else:
             # Use only Zero-Shot, pass or fail here.
-            applicable_topics, scores = self.get_topic_zero_shot(value, list(invalid_topics))
+            applicable_topics, scores = self.get_topic_zero_shot(
+                value, list(invalid_topics)
+            )
             for topic, score in zip(applicable_topics, scores):
                 if score > self._model_threshold:
                     sensitive_topics_warning = "Trigger warning:"
@@ -183,12 +191,11 @@ from restrict_to_topic import RestrictToTopic
                         sensitive_topics_warning += f"\n- {topic}"
                     fixed_message = f"{sensitive_topics_warning}\n\n{value}"
                     return FailResult(
-                        error_message="Sensitive topics detected: " + ", ".join(applicable_topics),
+                        error_message="Sensitive topics detected: "
+                        + ", ".join(applicable_topics),
                         fix_value=fixed_message,
                     )
             return PassResult()
-        
- 
 
         sensitive_topics_warning = "Trigger warning:"
         for topic in applicable_topics:
