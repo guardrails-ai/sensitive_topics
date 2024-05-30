@@ -2,7 +2,6 @@ import json
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from guardrails.hub.tryolabs.restricttotopic.validator import RestrictToTopic
-
 from guardrails.validator_base import (
     FailResult,
     PassResult,
@@ -12,7 +11,7 @@ from guardrails.validator_base import (
 
 
 @register_validator(name="guardrails/sensitive_topics", data_type="string")
-class SensitiveTopic(RestrictToTopic):
+class SensitiveTopic(RestrictToTopic):  # type: ignore
     """Checks if text contains any sensitive topics.
 
     Default behavior first runs a Zero-Shot model, and then falls back to
