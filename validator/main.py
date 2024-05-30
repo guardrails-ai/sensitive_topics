@@ -145,11 +145,12 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
     def get_topics_zero_shot(self, text: str, candidate_topics: List[str]) -> List[str]:
         applicable_topics = []
 
-        for candidate_topic in candidate_topics:
-            candidates = [candidate_topic, "other"]
-            topic, confidence = self.get_topic_zero_shot(text, candidates)
+        result = self.classifier(text, candidate_topics)
+        topics = result["labels"]
+        scores = result["scores"]
 
-            if confidence > self._model_threshold:
+        for topic, score in zip(topics, scores):
+            if score > self._model_threshold:
                 applicable_topics.append(topic)
 
         return applicable_topics
