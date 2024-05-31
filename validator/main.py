@@ -1,9 +1,5 @@
-import asyncio
-import json
 from typing import Any, Callable, Dict, List, Optional, Union
 
-import nest_asyncio
-from guardrails.hub.tryolabs.restricttotopic.validator import RestrictToTopic
 from guardrails.validator_base import (
     FailResult,
     PassResult,
@@ -11,7 +7,7 @@ from guardrails.validator_base import (
     register_validator,
 )
 
-nest_asyncio.apply()
+from guardrails.hub.tryolabs.restricttotopic.validator import RestrictToTopic
 
 
 @register_validator(name="guardrails/sensitive_topics", data_type="string")
@@ -61,24 +57,31 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
         disable_classifier (bool, Optional, defaults to False): controls whether
             to use the Zero-Shot model. At least one of disable_classifier and
             disable_llm must be False.
+        classifier_api_endpoint (str, Optional, defaults to None): An API endpoint
+            to recieve post requests that will be used when provided. If not provided, a 
+            local model will be initialized.
         disable_llm (bool, Optional, defaults to False): controls whether to use
             the LLM fallback. At least one of disable_classifier and
             disable_llm must be False.
-        model_threshold (float, Optional, defaults to 0.5): The threshold used to
+        zero_shot_threshold (float, Optional, defaults to 0.5): The threshold used to
             determine whether to accept a topic from the Zero-Shot model. Must be
             a number between 0 and 1.
+        llm_threshold (int, Optional, defaults to 3): The threshold used to determine
+        if a topic exists based on the provided llm api. Must be between 0 and 5.
     """
 
     def __init__(
         self,
-        sensitive_topics: Optional[List[str]] = None,
+        sensitive_topics: Optional[List[str]] = [],
         device: Optional[int] = -1,
         model: Optional[str] = "facebook/bart-large-mnli",
         llm_callable: Union[str, Callable, None] = None,
         disable_classifier: Optional[bool] = False,
+        classifier_api_endpoint: Optional[str] = None,
         disable_llm: Optional[bool] = False,
         on_fail: Optional[Callable[..., Any]] = None,
-        model_threshold: Optional[float] = 0.5,
+        zero_shot_threshold: Optional[float] = 0.5,
+        llm_theshold: Optional[int] = 3,
     ):
         if sensitive_topics is None:
             sensitive_topics = [
@@ -102,10 +105,12 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
             device=device,
             model=model,
             disable_classifier=disable_classifier,
+            classifier_api_endpoint=classifier_api_endpoint,
             disable_llm=disable_llm,
             llm_callable=llm_callable,
             on_fail=on_fail,
-            model_threshold=model_threshold,
+            zero_shot_threshold=zero_shot_threshold,
+            llm_theshold=llm_theshold,
         )
 
     def get_args(self) -> Dict[str, Any]:
@@ -120,101 +125,54 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
             "model_threshold": self._kwargs.get("model_threshold", 0.5),
         }
 
-    def get_topics_ensemble(self, text: str, candidate_topics: List[str]):
-        applicable_topics = []
-
-        topics, scores = self.get_topic_zero_shot(text, candidate_topics)
-        for topic, score in zip(topics, scores):
-            if score > self._model_threshold:
-                applicable_topics.append(topic)
-            elif score < self._model_threshold:
-                response = self.call_llm(text, candidate_topics)
-                topic = json.loads(response)["topic"]
-            if topic in self._invalid_topics:
-                applicable_topics.append(topic)
-        return applicable_topics
-
-    async def get_topics_llm(self, text: str, candidate_topics: List[str]) -> List[str]:
-        applicable_topics = []
-
-        async def process_candidate(candidate_topic):
-            candidates = [candidate_topic, "other"]
-            response = await self.call_llm(text, candidates)
-            topic = json.loads(response)["topic"]
-
-            if topic not in self._invalid_topics:
-                applicable_topics.append(topic)
-
-        tasks = []
-        for candidate_topic in candidate_topics:
-            task = asyncio.create_task(process_candidate(candidate_topic))
-            tasks.append(task)
-
-        await asyncio.gather(*tasks)
-        return applicable_topics
-
-    def get_topics_zero_shot(self, text: str, candidate_topics: List[str]) -> List[str]:
-        applicable_topics = []
-
-        result = self.classifier(text, candidate_topics)
-        topics = result["labels"]
-        scores = result["scores"]
-
-        for topic, score in zip(topics, scores):
-            if score > self._model_threshold:
-                applicable_topics.append(topic)
-
-        return applicable_topics
-
     def validate(
-        self, value: str, metadata: Optional[Dict[str, Any]]
+        self, value: str, metadata: Optional[Dict[str, Any]] = {}
     ) -> ValidationResult:
-        invalid_topics = set(self._invalid_topics)
+        """Validates that a string contains at least one valid topic and no invalid topics.
 
-        # throw if there are no invalid topics
+        Args:
+            value (str): The given string to classify
+            metadata (Optional[Dict[str, Any]], optional): _description_. Defaults to {}.
+
+        Raises:
+            ValueError: If a topic is invalid and valid
+            ValueError: If no valid topics are set
+            ValueError: If there is no llm or zero shot classifier set
+
+        Returns:
+            ValidationResult: PassResult if a topic is restricted and valid,
+            FailResult otherwise
+        """
+        # Verify at least one invalid topic exists.
+        invalid_topics = list(set(self._invalid_topics))
         if not invalid_topics:
-            raise RuntimeError("No invalid topics provided")
+            raise ValueError("A set of invalid topics must be provided.")
 
-        # Check which model(s) to use
-        if self._disable_classifier and self._disable_llm:
-            # Error, no model set
+        # Verify at least one is enabled
+        if self._disable_classifier and self._disable_llm:  # Error, no model set
             raise ValueError("Either classifier or llm must be enabled.")
-        elif (
-            not self._disable_classifier and not self._disable_llm
-        ):  # Use ensemble (Zero-Shot + Ensemble)
-            applicable_topics = self.get_topics_ensemble(value, list(invalid_topics))
-            if not applicable_topics:
-                return PassResult()
-        elif self._disable_classifier and not self._disable_llm:
-            # Use only LLM, pass if good. If not, exit and fail
-            applicable_topics = asyncio.run(
-                self.get_topics_llm(value, list(invalid_topics))
-            )
-            if not applicable_topics:
-                return PassResult()
-        else:
-            # Use only Zero-Shot, pass or fail here.
-            applicable_topics, scores = self.get_topic_zero_shot(
-                value, list(invalid_topics)
-            )
-            for topic, score in zip(applicable_topics, scores):
-                if score > self._model_threshold:
-                    sensitive_topics_warning = "Trigger warning:"
-                    for topic in applicable_topics:
-                        sensitive_topics_warning += f"\n- {topic}"
-                    fixed_message = f"{sensitive_topics_warning}\n\n{value}"
-                    return FailResult(
-                        error_message="Sensitive topics detected: "
-                        + ", ".join(applicable_topics),
-                        fix_value=fixed_message,
-                    )
-            return PassResult()
 
-        sensitive_topics_warning = "Trigger warning:"
-        for topic in applicable_topics:
-            sensitive_topics_warning += f"\n- {topic}"
-        fixed_message = f"{sensitive_topics_warning}\n\n{value}"
-        return FailResult(
-            error_message="Sensitive topics detected: " + ", ".join(applicable_topics),
-            fix_value=fixed_message,
-        )
+        # Case: both enabled/ensemble (Zero-Shot + Ensemble)
+        elif not self._disable_classifier and not self._disable_llm:
+            found_topics = self.get_topic_ensemble(value, invalid_topics)
+
+        # Case: Only use LLM
+        elif self._disable_classifier and not self._disable_llm:
+            found_topics = self.get_topic_llm(value, invalid_topics)
+
+        # Case: Only use Zero-Shot
+        elif not self._disable_classifier and self._disable_llm:
+            found_topics = self.get_topic_zero_shot(value, invalid_topics)
+
+        # Determine if invalid topics were found
+        invalid_topics_found = [
+            topic for topic in found_topics if topic in self._invalid_topics
+        ]
+
+        # Require at least one valid topic and no invalid topics
+        if invalid_topics_found:
+            return FailResult(
+                error_message=f"Invalid topics found: {invalid_topics_found}"
+            )
+
+        return PassResult()
