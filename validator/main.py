@@ -1,12 +1,12 @@
 from typing import Any, Callable, Dict, List, Optional, Union
 
+from guardrails.hub.tryolabs.restricttotopic.validator import RestrictToTopic
 from guardrails.validator_base import (
     FailResult,
     PassResult,
     ValidationResult,
     register_validator,
 )
-from restrict_to_topic import RestrictToTopic
 
 
 @register_validator(name="guardrails/sensitive_topics", data_type="string")
@@ -155,7 +155,7 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
             found_topics = self.get_topics_llm(value, invalid_topics)
         # Zero Shot Classifier Only
         elif not self._disable_classifier and self._disable_llm:
-            found_topics, _ = self.get_topic_zero_shot(value, invalid_topics)
+            found_topics = self.get_topics_zero_shot(value, invalid_topics)
         else:
             raise ValueError("Either classifier or llm must be enabled.")
 
