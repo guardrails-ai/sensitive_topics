@@ -6,8 +6,7 @@ from guardrails.validator_base import (
     ValidationResult,
     register_validator,
 )
-
-from guardrails.hub.tryolabs.restricttotopic.validator import RestrictToTopic
+from restrict_to_topic import RestrictToTopic
 
 
 @register_validator(name="guardrails/sensitive_topics", data_type="string")
@@ -58,7 +57,7 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
             to use the Zero-Shot model. At least one of disable_classifier and
             disable_llm must be False.
         classifier_api_endpoint (str, Optional, defaults to None): An API endpoint
-            to recieve post requests that will be used when provided. If not provided, a 
+            to recieve post requests that will be used when provided. If not provided, a
             local model will be initialized.
         disable_llm (bool, Optional, defaults to False): controls whether to use
             the LLM fallback. At least one of disable_classifier and
@@ -148,21 +147,17 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
         if not invalid_topics:
             raise ValueError("A set of invalid topics must be provided.")
 
-        # Verify at least one is enabled
-        if self._disable_classifier and self._disable_llm:  # Error, no model set
-            raise ValueError("Either classifier or llm must be enabled.")
-
-        # Case: both enabled/ensemble (Zero-Shot + Ensemble)
-        elif not self._disable_classifier and not self._disable_llm:
-            found_topics = self.get_topic_ensemble(value, invalid_topics)
-
-        # Case: Only use LLM
+        # Ensemble method
+        if not self._disable_classifier and not self._disable_llm:
+            found_topics = self.get_topics_ensemble(value, invalid_topics)
+        # LLM Classifier Only
         elif self._disable_classifier and not self._disable_llm:
-            found_topics = self.get_topic_llm(value, invalid_topics)
-
-        # Case: Only use Zero-Shot
+            found_topics = self.get_topics_llm(value, invalid_topics)
+        # Zero Shot Classifier Only
         elif not self._disable_classifier and self._disable_llm:
-            found_topics = self.get_topic_zero_shot(value, invalid_topics)
+            found_topics, _ = self.get_topic_zero_shot(value, invalid_topics)
+        else:
+            raise ValueError("Either classifier or llm must be enabled.")
 
         # Determine if invalid topics were found
         invalid_topics_found = [
