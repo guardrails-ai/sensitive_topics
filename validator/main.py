@@ -80,7 +80,7 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
         disable_llm: Optional[bool] = False,
         on_fail: Optional[Callable[..., Any]] = None,
         zero_shot_threshold: Optional[float] = 0.5,
-        llm_theshold: Optional[int] = 3,
+        llm_threshold: Optional[int] = 3,
     ):
         if sensitive_topics is None:
             sensitive_topics = [
@@ -109,7 +109,7 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
             llm_callable=llm_callable,
             on_fail=on_fail,
             zero_shot_threshold=zero_shot_threshold,
-            llm_theshold=llm_theshold,
+            llm_threshold=llm_threshold,
         )
 
     def get_args(self) -> Dict[str, Any]:
