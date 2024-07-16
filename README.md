@@ -77,7 +77,8 @@ Initializes a new instance of the Validator class.
 - **`disable_classifier`** *(bool, Optional)*: controls whether to use the Zero-Shot model. At least one of disable_classifier and disable_llm must be False.
 - **`classifier_api_endpoint`** *(str, Optional)*: An API endpoint to receive post requests that will be used when provided. If not provided, a local model will be initialized.
 - **`disable_llm`** *(bool, Optional)*: controls whether to use the LLM fallback. At least one of disable_classifier and disable_llm must be False.
-- **`model_threshold`** *(float, Optional)*: The threshold used to determine whether to accept a topic from the Zero-Shot model. Must be a number between 0 and 1.
+- **`zero_shot_threshold`** *(float, Optional)*: The threshold used to determine whether to accept a topic from the Zero-Shot model. Must be a number between 0 and 1.
+- **`llm_threshold`** *(float, Optional)*: The threshold used to determine if a topic exists based on the provided llm api. Must be between 0 and 5.
 - **`on_fail`** *(str, Callable)*: The policy to enact when a validator fails. If `str`, must be one of `reask`, `fix`, `filter`, `refrain`, `noop`, `exception` or `fix_reask`. Otherwise, must be a function that is called when the validator fails.
 </ul>
 <br/>
