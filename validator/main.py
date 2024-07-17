@@ -9,7 +9,7 @@ from guardrails.validator_base import (
 )
 
 
-@register_validator(name="guardrails/sensitive_topics", data_type="string")
+@register_validator(name="guardrails/sensitive_topics", data_type="string", has_guardrails_endpoint=True)
 class SensitiveTopic(RestrictToTopic):  # type: ignore
     """Checks if text contains any sensitive topics.
 
