@@ -82,7 +82,7 @@ class SensitiveTopics:
             ]
 
             if not pred_labels:
-                pred_labels = ["No valid topic found."]
+                pred_labels = ["No sensitive topics found."]
 
             outputs.append(
                 InferenceData(
