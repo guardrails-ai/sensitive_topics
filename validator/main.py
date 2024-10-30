@@ -1,6 +1,7 @@
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from guardrails.hub.tryolabs.restricttotopic.validator import RestrictToTopic
+from guardrails.hub import RestrictToTopic
+
 from guardrails.validator_base import (
     FailResult,
     PassResult,
