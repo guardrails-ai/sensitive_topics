@@ -18,6 +18,9 @@ dev = [
     "pytest",
     "ruff"
 ]
+validators = [
+    "tryolabs-grhub-restricttotopic<1.0.0"
+]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
