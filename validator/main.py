@@ -10,7 +10,7 @@ from guardrails.validator_base import (
 )
 
 
-@register_validator(name="guardrails/sensitive_topics", data_type="string")
+@register_validator(name="guardrails/sensitive_topics", data_type="string", has_guardrails_endpoint=True)
 class SensitiveTopic(RestrictToTopic):  # type: ignore
     """Checks if text contains any sensitive topics.
 
@@ -82,6 +82,7 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
         on_fail: Optional[Callable[..., Any]] = None,
         zero_shot_threshold: Optional[float] = 0.5,
         llm_threshold: Optional[int] = 3,
+        **kwargs,
     ):
         if sensitive_topics is None:
             sensitive_topics = [
@@ -111,6 +112,7 @@ class SensitiveTopic(RestrictToTopic):  # type: ignore
             on_fail=on_fail,
             zero_shot_threshold=zero_shot_threshold,
             llm_threshold=llm_threshold,
+            **kwargs,
         )
 
     def get_args(self) -> Dict[str, Any]:
